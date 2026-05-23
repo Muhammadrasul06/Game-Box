@@ -1,5 +1,5 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+<img width="1200" height="475" alt="GHBanner" src="[https://ai.google.dev/static/site-assets/images/share-ais-513315318.png](https://chatgpt.com/backend-api/estuary/content?id=file_00000000d6147243909bc8da5c69ded5&ts=494322&p=fs&cid=1&sig=b7ef3a5ceb31233b4e5b0284b8a000db9740ccc71717c0f8a2e5a7abbc9368a3&v=0)" />
 </div>
 
 # Arcade Game Hub
