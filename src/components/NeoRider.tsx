@@ -105,6 +105,11 @@ export const NeoRider: React.FC<NeoRiderProps> = ({
     lastGroundedAngle: 0,
     flipTrickLogged: false,
     boostCharge: 100,
+    jumpWasPressed: false,
+    speedStage: 0,
+    lastSpeedMilestone: 0,
+    jumpCooldown: 0,
+    previousGroundAngle: 0,
 
     // Keyboard inputs
     keys: {} as Record<string, boolean>,
@@ -327,16 +332,16 @@ export const NeoRider: React.FC<NeoRiderProps> = ({
     // Progressive level templates selected by travel distance
     if (dist < 150) {
       // Relaxing early gameplay flow: waves, flat boost tunnels, downhill runs
-      pool = ['smooth_hills', 'long_downhill', 'speed_tunnels', 'wave_tracks'];
+      pool = ['smooth_hills', 'long_downhill', 'speed_tunnels', 'wave_tracks', 'mega_slope'];
     } else if (dist < 400) {
       // Fun-filled stunt ramps, speed pads, secondary loop ridges
-      pool = ['smooth_hills', 'steep_ramps', 'long_downhill', 'speed_tunnels', 'loop_like_curve', 'wave_tracks', 'split_terrain'];
+      pool = ['smooth_hills', 'steep_ramps', 'mega_slope', 'long_downhill', 'speed_tunnels', 'loop_like_curve', 'wave_tracks', 'split_terrain', 'big_air_ramp'];
     } else if (dist < 800) {
       // Technical flow: danger gaps, vertical drops, spike valleys, speed ramps
-      pool = ['steep_ramps', 'long_downhill', 'loop_like_curve', 'danger_gaps', 'spike_zones', 'vertical_drops', 'split_terrain'];
+      pool = ['steep_ramps', 'mega_slope', 'big_air_ramp', 'long_downhill', 'loop_like_curve', 'danger_gaps', 'spike_zones', 'vertical_drops', 'split_terrain'];
     } else {
       // Extreme stunt master challenges: steep cliffs, long gaps, dense hazards
-      pool = ['steep_ramps', 'loop_like_curve', 'danger_gaps', 'spike_zones', 'vertical_drops', 'split_terrain'];
+      pool = ['steep_ramps', 'mega_slope', 'big_air_ramp', 'loop_like_curve', 'danger_gaps', 'spike_zones', 'vertical_drops', 'split_terrain'];
     }
 
     const chosen = pool[Math.floor(Math.random() * pool.length)];
@@ -344,7 +349,7 @@ export const NeoRider: React.FC<NeoRiderProps> = ({
     if (chosen === 'smooth_hills') {
       // 1. Smooth rolling scenic hills
       const len = 30;
-      const amp = 18;
+      const amp = 12;
       for (let i = 0; i < len; i++) {
         const px = lastX + spacing;
         const py = lastY + Math.sin((i / len) * Math.PI * 2) * amp;
@@ -411,6 +416,78 @@ export const NeoRider: React.FC<NeoRiderProps> = ({
           spawnCoin(px, py - 32, 10);
         }
       }
+
+    } else if (chosen === 'mega_slope') {
+      // Big American-rollercoaster style slope: long climb, crest, and fast downhill.
+      const climbLen = 30;
+      const crestLen = 10;
+      const downhillLen = 34;
+      const climbHeight = -170;
+
+      for (let i = 0; i < climbLen; i++) {
+        const px = lastX + spacing;
+        const t = i / (climbLen - 1);
+        const py = lastY + climbHeight * (0.5 - 0.5 * Math.cos(t * Math.PI));
+        data.trackPoints.push({ x: px, y: py, angle: 0, type: i > climbLen * 0.45 ? 'ramp' : 'normal' });
+        lastX = px;
+        if (i % 7 === 0) spawnCoin(px, py - 42, 15);
+      }
+
+      const topY = lastY + climbHeight;
+      for (let i = 0; i < crestLen; i++) {
+        const px = lastX + spacing;
+        const t = i / (crestLen - 1);
+        const py = topY + Math.sin(t * Math.PI) * 14;
+        data.trackPoints.push({ x: px, y: py, angle: 0, type: 'ramp' });
+        lastX = px;
+      }
+
+      const downY = topY + 210;
+      for (let i = 0; i < downhillLen; i++) {
+        const px = lastX + spacing;
+        const t = i / (downhillLen - 1);
+        const py = topY + (downY - topY) * (0.5 - 0.5 * Math.cos(t * Math.PI));
+        data.trackPoints.push({ x: px, y: py, angle: 0, type: 'normal' });
+        lastX = px;
+        if (i % 8 === 2) spawnCoin(px, py - 48, 15);
+      }
+      lastY = downY;
+
+    } else if (chosen === 'big_air_ramp') {
+      // A large launch ramp with a wide safe landing slope. This creates real airtime.
+      const runUp = 12;
+      const rampLen = 18;
+      const gapLen = dist < 500 ? 5 : 8;
+      const landingLen = 28;
+      for (let i = 0; i < runUp; i++) {
+        const px = lastX + spacing;
+        data.trackPoints.push({ x: px, y: lastY, angle: 0, type: i > runUp - 4 ? 'boost' : 'normal' });
+        lastX = px;
+      }
+      const launchY = lastY - 125;
+      for (let i = 0; i < rampLen; i++) {
+        const px = lastX + spacing;
+        const t = i / (rampLen - 1);
+        const py = lastY + (launchY - lastY) * Math.pow(t, 1.55);
+        data.trackPoints.push({ x: px, y: py, angle: 0, type: 'ramp' });
+        lastX = px;
+      }
+      for (let i = 0; i < gapLen; i++) {
+        const px = lastX + spacing;
+        data.trackPoints.push({ x: px, y: 850, angle: 0, type: 'gap' });
+        lastX = px;
+      }
+      const catchY = launchY + 135;
+      for (let i = 0; i < landingLen; i++) {
+        const px = lastX + spacing;
+        const t = i / (landingLen - 1);
+        const py = catchY - 70 * (1 - t);
+        data.trackPoints.push({ x: px, y: py, angle: 0, type: 'normal' });
+        lastX = px;
+        if (i % 6 === 1) spawnCoin(px, py - 40, 15);
+      }
+      spawnCoinArc(lastX - (landingLen + gapLen + rampLen) * spacing, lastX - landingLen * spacing, launchY - 70, 7, 20);
+      lastY = catchY;
 
     } else if (chosen === 'danger_gaps') {
       // 6. Classic hazard chasms with precision coin guides
@@ -555,6 +632,11 @@ export const NeoRider: React.FC<NeoRiderProps> = ({
     data.lastGroundedAngle = 0;
     data.flipTrickLogged = false;
     data.boostCharge = 100;
+    data.jumpWasPressed = false;
+    data.speedStage = 0;
+    data.lastSpeedMilestone = 0;
+    data.jumpCooldown = 0;
+    data.previousGroundAngle = 0;
 
     data.throttleActive = false;
     data.rotatingLeft = false;
@@ -750,29 +832,52 @@ export const NeoRider: React.FC<NeoRiderProps> = ({
       const data = engineRef.current;
       const b = data.bike;
 
-      // Inputs (Hold LMB anywhere, Space, or W to accelerate and rotate counterclockwise/backward)
-      const isHoldingMain = data.keys['w'] || data.keys['arrowup'] || data.keys[' '] || data.keys['lmb'] || data.throttleActive;
+      // Inputs:
+      // W / Up / LMB / touch gas = accelerate
+      // Space = jump
+      // Shift / Nitro button = boost
+      const isHoldingMain = data.keys['w'] || data.keys['arrowup'] || data.keys['lmb'] || data.throttleActive;
       const inputLeft = data.keys['a'] || data.keys['arrowleft'] || data.rotatingLeft;
       const inputRight = data.keys['d'] || data.keys['arrowright'] || data.rotatingRight;
-      const inputBoost = data.keys[' '] || data.boostActive;
+      const inputJump = data.keys[' '];
+      const inputBoost = data.keys['shift'] || data.boostActive;
 
-      // Sub-step physical parameters mapped from frame values
-      const stepGravity = 0.32 / 3;
-      const stepNormalMaxSpeed = 9.5 / 3;
-      const stepBoostMaxSpeed = 14 / 3;
-      const stepBaseAccel = 0.18 / 3;
-      const stepAirAccel = 0.08 / 3;
+      // Speed progression:
+      // every 200m reached increases the bike's permanent speed tier.
+      // It stays faster even if the player stops.
+      const reachedStage = Math.floor(data.distanceTraveled / 200);
+      if (reachedStage > data.speedStage) {
+        data.speedStage = Math.min(reachedStage, 12);
+        data.lastSpeedMilestone = data.speedStage * 200;
+        data.trickAnims.push({
+          text: `SPEED UP x${data.speedStage}`,
+          x: b.x + 80,
+          y: b.y - 90,
+          life: 1800
+        });
+      }
 
-      // Gravity pulls it down naturally
+      // Sub-step physical parameters mapped from frame values.
+      // Keep movement arcade-clean: W accelerates only, Space jumps, A/D tilt.
+      const speedBonus = data.speedStage * 0.55;
+      const stepGravity = 0.42 / 3;
+      const stepNormalMaxSpeed = (9.8 + speedBonus) / 3;
+      const stepBoostMaxSpeed = (14.5 + speedBonus) / 3;
+      const stepBaseAccel = (0.22 + data.speedStage * 0.012) / 3;
+      const stepAirAccel = (0.035 + data.speedStage * 0.003) / 3;
+      const jumpImpulse = 9.2;
+
+      // Gravity pulls the bike down clearly so ramps and drops feel real.
       b.vy += stepGravity;
+      data.jumpCooldown = Math.max(0, data.jumpCooldown - dt);
 
       // Apply drag factors
       const isBoosting = inputBoost && data.boostCharge > 0;
       const activeMaxSpeed = isBoosting ? stepBoostMaxSpeed : stepNormalMaxSpeed;
 
       // Gentle realistic speeds decay drag
-      b.vx *= 0.9973; // Math.pow(0.992, 1/3)
-      b.vy *= 0.9983; // Math.pow(0.995, 1/3)
+      b.vx *= 0.9976; // light horizontal drag
+      b.vy *= 0.9990; // keep gravity/falling readable
 
       // Clamp vx between 0 and active limits
       b.vx = Math.max(0, Math.min(b.vx, activeMaxSpeed));
@@ -814,7 +919,7 @@ export const NeoRider: React.FC<NeoRiderProps> = ({
       const eitherGrounded = data.frontGrounded || data.rearGrounded;
 
       // Hard landing camera shake and high vertical speed dampening suspension
-      const stiffness = 0.28; 
+      const stiffness = 0.18; 
       if (frontPenetration) {
         const depth = (frontInf.y - wheelR) - fwy;
         b.vy += depth * stiffness;
@@ -844,15 +949,15 @@ export const NeoRider: React.FC<NeoRiderProps> = ({
           }
         }
 
-        if (b.vy > 0) b.vy *= 0.65; // absorb impact heavily
+        if (b.vy > 0) b.vy *= 0.72; // absorb impact without killing ramp energy
 
         // Align bike angle nicely with the ground normal
         let diff = frontInf.angle - b.angle;
         while (diff < -Math.PI) diff += Math.PI * 2;
         while (diff > Math.PI) diff -= Math.PI * 2;
-        b.angularVelocity += (diff * 0.03) / 3;
+        b.angularVelocity += (diff * 0.012) / 3;
 
-        b.y += depth * 0.35;
+        b.y += depth * 0.18;
 
         if (frontInf.type === 'boost') {
           b.vx += Math.cos(frontInf.angle) * 0.8;
@@ -890,21 +995,21 @@ export const NeoRider: React.FC<NeoRiderProps> = ({
           }
         }
 
-        if (b.vy > 0) b.vy *= 0.65; // absorb impact heavily
+        if (b.vy > 0) b.vy *= 0.72; // absorb impact without killing ramp energy
 
         // Align bike angle nicely with the ground normal
         let diff = rearInf.angle - b.angle;
         while (diff < -Math.PI) diff += Math.PI * 2;
         while (diff > Math.PI) diff -= Math.PI * 2;
-        b.angularVelocity += (diff * 0.03) / 3;
+        b.angularVelocity += (diff * 0.012) / 3;
 
-        b.y += depth * 0.35;
+        b.y += depth * 0.18;
 
         // Satisfying landing alignment damping - absorbs heavy rolling momentum without flipping instantly
         let rollDiff = rearInf.angle - b.angle;
         while (rollDiff < -Math.PI) rollDiff += Math.PI * 2;
         while (rollDiff > Math.PI) rollDiff -= Math.PI * 2;
-        b.angle += rollDiff * 0.08;
+        b.angle += rollDiff * 0.025;
 
         if (rearInf.type === 'boost') {
           b.vx += Math.cos(rearInf.angle) * 0.8;
@@ -913,9 +1018,62 @@ export const NeoRider: React.FC<NeoRiderProps> = ({
         }
       }
 
-      // Projected Velocity Landing Momentum - redirects vertical down force into forward thrust slope speed!
-      if (eitherGrounded) {
-        const activeAngle = data.rearGrounded ? rearInf.angle : frontInf.angle;
+      // Space jump: a real upward jump, not nitro.
+      // It must run after wheel collision and it must break ground contact for this frame,
+      // otherwise the slope projection code cancels the jump immediately.
+      let jumpedThisStep = false;
+      if (inputJump && !data.jumpWasPressed && eitherGrounded && data.jumpCooldown <= 0) {
+        b.vy = -jumpImpulse;
+        b.y -= 8;
+        b.angularVelocity += -0.01;
+        data.frontGrounded = false;
+        data.rearGrounded = false;
+        data.jumpWasPressed = true;
+        data.jumpCooldown = 0.25;
+        jumpedThisStep = true;
+        if (data.camera) {
+          data.camera.shake = Math.max(data.camera.shake, 4);
+        }
+        for (let j = 0; j < 8; j++) {
+          data.particles.push({
+            id: `p_jump_${Math.random()}`,
+            x: (fwx + rwx) / 2 + (Math.random() - 0.5) * 16,
+            y: Math.max(fwy, rwy) + 10,
+            vx: -b.vx * 0.18 + (Math.random() - 0.5) * 2,
+            vy: -2.5 - Math.random() * 2,
+            size: 2.5 + Math.random() * 2.5,
+            color: '#fbbf24',
+            alpha: 0.9,
+            life: 0,
+            maxLife: 20
+          });
+        }
+        playSynthesizedSfx('boost');
+      }
+      if (!inputJump) {
+        data.jumpWasPressed = false;
+      }
+
+      let groundedAfterJump = (data.frontGrounded || data.rearGrounded) && !jumpedThisStep;
+
+      // Stable ground angle: when both wheels touch, use the average angle.
+      // This prevents the rear wheel from dragging and stopping the bike on tiny waves.
+      let stableGroundAngle = 0;
+      if (data.frontGrounded && data.rearGrounded) {
+        stableGroundAngle = Math.atan2(
+          Math.sin(frontInf.angle) + Math.sin(rearInf.angle),
+          Math.cos(frontInf.angle) + Math.cos(rearInf.angle)
+        );
+      } else if (data.rearGrounded) {
+        stableGroundAngle = rearInf.angle;
+      } else if (data.frontGrounded) {
+        stableGroundAngle = frontInf.angle;
+      }
+
+      // Projected Velocity Landing Momentum - redirects vertical down force into forward thrust slope speed.
+      // Keep it softer, because the old projection killed speed on short curved roads.
+      if (groundedAfterJump) {
+        const activeAngle = stableGroundAngle;
         const currentSpeed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
         
         if (currentSpeed > 0.5) {
@@ -924,18 +1082,47 @@ export const NeoRider: React.FC<NeoRiderProps> = ({
           const dot = b.vx * slopeCos + b.vy * slopeSin;
           
           if (dot > 0) {
-            b.vx = slopeCos * dot * 0.95 + b.vx * 0.05;
-            b.vy = slopeSin * dot * 0.95 + b.vy * 0.05;
+            b.vx = slopeCos * dot * 0.55 + b.vx * 0.45;
+            b.vy = slopeSin * dot * 0.45 + b.vy * 0.55;
           }
         }
       }
 
+      // Tiny natural lift when leaving the top of a curved ramp/hill.
+      // This stops the bike from looking glued flat to every wave.
+      if (groundedAfterJump) {
+        const activeAngle = stableGroundAngle;
+        const wasClimbing = data.previousGroundAngle < -0.035;
+        const nowDropping = activeAngle > -0.005;
+        if (wasClimbing && nowDropping && b.vx > 1.35 && data.jumpCooldown <= 0) {
+          b.vy -= Math.min(3.1, 0.9 + b.vx * 0.30);
+          b.y -= 5;
+          data.frontGrounded = false;
+          data.rearGrounded = false;
+          data.jumpCooldown = 0.12;
+          groundedAfterJump = false;
+        }
+        data.previousGroundAngle = activeAngle;
+      }
+
       // Forward Thrust / Gas (moves forward and feels responsive)
       if (isHoldingMain) {
-        if (eitherGrounded) {
-          const activeAngle = data.rearGrounded ? rearInf.angle : frontInf.angle;
+        if (groundedAfterJump) {
+          const activeAngle = stableGroundAngle;
           b.vx += Math.cos(activeAngle) * stepBaseAccel;
           b.vy += Math.sin(activeAngle) * stepBaseAccel;
+
+          // Anti-stall rolling assist: small waves should never stop the bike while W/gas is held.
+          // It does not teleport the bike; it only keeps arcade momentum alive on bumpy curves.
+          const minRollingSpeed = Math.min(activeMaxSpeed * 0.72, 1.65 + data.speedStage * 0.08);
+          if (b.vx < minRollingSpeed) {
+            b.vx += (minRollingSpeed - b.vx) * 0.18;
+          }
+
+          // Strong upward ramps should throw the bike a little, not glue it to the line.
+          if (activeAngle < -0.18 && b.vx > 1.8 && data.jumpCooldown <= 0) {
+            b.vy += Math.sin(activeAngle) * 0.18;
+          }
 
           // Smoke trail wheel particles
           if (Math.random() < 0.2) {
@@ -953,41 +1140,35 @@ export const NeoRider: React.FC<NeoRiderProps> = ({
             });
           }
         } else {
-          // slight rocket power acceleration in air
-          b.vx += Math.cos(b.angle) * stepAirAccel;
-          b.vy += Math.sin(b.angle) * stepAirAccel;
+          // tiny air control only, not fake rocket flight
+          b.vx += Math.max(0.2, Math.cos(b.angle)) * stepAirAccel;
         }
       }
 
-      // Torques/Rotational mechanics
+      // Torques / rotation controls.
+      // W is GAS ONLY. It must never rotate the motorcycle.
+      // A/D are the only manual tilt controls.
       let torque = 0;
-      if (!eitherGrounded) {
-        // Air controlled rotation - rotates backward with main hold (-0.018)
-        if (isHoldingMain) {
-          torque += -0.018;
-          if (Math.random() < 0.06) playSynthesizedSfx('rotate');
-        }
-        // Fine secondary adjustments (A / D)
+      if (!groundedAfterJump) {
         if (inputLeft) {
-          torque += -0.012;
-          if (Math.random() < 0.06) playSynthesizedSfx('rotate');
+          torque += -0.020;
+          if (Math.random() < 0.04) playSynthesizedSfx('rotate');
         }
         if (inputRight) {
-          torque += 0.012;
-          if (Math.random() < 0.06) playSynthesizedSfx('rotate');
+          torque += 0.020;
+          if (Math.random() < 0.04) playSynthesizedSfx('rotate');
         }
       } else {
-        // on ground, angular torque is very weak (0.004)
-        if (isHoldingMain) torque += -0.004;
-        if (inputLeft) torque += -0.004;
-        if (inputRight) torque += 0.004;
+        // On ground, A/D are only small balance corrections, not spinning controls.
+        if (inputLeft) torque += -0.0025;
+        if (inputRight) torque += 0.0025;
       }
 
       b.angularVelocity += torque / 3;
 
-      // Active gyroscope alignment - when no buttons are held, stabilizer aligns with travel vector
-      const hasSteeringInput = isHoldingMain || inputLeft || inputRight;
-      if (!eitherGrounded && !hasSteeringInput) {
+      // Active stabilizer: when the player is not tilting, slowly calm rotation down.
+      const hasSteeringInput = inputLeft || inputRight;
+      if (!groundedAfterJump && !hasSteeringInput) {
         const flightAngle = Math.atan2(b.vy, Math.max(0.1, b.vx));
         let diff = (flightAngle * 0.4) - b.angle;
         while (diff < -Math.PI) diff += Math.PI * 2;
@@ -996,15 +1177,15 @@ export const NeoRider: React.FC<NeoRiderProps> = ({
       }
 
       // Angular damping to prevent runaway loops
-      const currentAngDamping = eitherGrounded ? 0.88 : 0.965;
+      const currentAngDamping = groundedAfterJump ? 0.82 : 0.94;
       b.angularVelocity *= currentAngDamping;
 
       // Max angular velocity clamp
-      const maxAngVel = 0.13;
+      const maxAngVel = 0.105;
       if (b.angularVelocity > maxAngVel) b.angularVelocity = maxAngVel;
       if (b.angularVelocity < -maxAngVel) b.angularVelocity = -maxAngVel;
 
-      // Space Booster / Nitro
+      // Shift Booster / Nitro
       if (inputBoost && data.boostCharge > 0) {
         const boostAmt = 0.15;
         b.vx += Math.cos(b.angle) * boostAmt;
@@ -1247,7 +1428,6 @@ export const NeoRider: React.FC<NeoRiderProps> = ({
     const isHoldingMain = Boolean(
       data.keys['w'] ||
       data.keys['arrowup'] ||
-      data.keys[' '] ||
       data.keys['lmb'] ||
       data.throttleActive
     );
@@ -1911,7 +2091,7 @@ export const NeoRider: React.FC<NeoRiderProps> = ({
 
               <div className="py-2.5 px-4 bg-white/[0.03] border border-white/5 rounded-xl text-left flex flex-col gap-1.5">
                 <p className="text-[11px] text-zinc-400 leading-relaxed font-mono">
-                  ★ Ride forward, accelerate through cyber ramps, collect brilliant coin gems, and pull marvelous flips in mid-air to super-charge your nitro boost fuel!
+                  ★ Ride forward, jump over cyber ramps, collect coin gems, and survive as the bike gets faster every 200m.
                 </p>
                 <div className="text-[10px] text-indigo-400 font-bold flex justify-between font-mono mt-1 pt-1 border-t border-white/5">
                   <span>Best Distance Record:</span>
@@ -1970,10 +2150,12 @@ export const NeoRider: React.FC<NeoRiderProps> = ({
                     <span className="text-zinc-500">W / Up Arrow</span>
                     <span className="text-lime-400 font-extrabold">Gas / Accelerate</span>
                     <span className="text-zinc-500">A / Left Arrow</span>
-                    <span className="text-cyan-400">Spin backward (air)</span>
+                    <span className="text-cyan-400">Tilt backward (air)</span>
                     <span className="text-zinc-500">D / Right Arrow</span>
-                    <span className="text-cyan-400">Spin forward (air)</span>
+                    <span className="text-cyan-400">Tilt forward (air)</span>
                     <span className="text-zinc-500">Spacebar</span>
+                    <span className="text-amber-300 font-extrabold">Jump</span>
+                    <span className="text-zinc-500">Shift</span>
                     <span className="text-pink-400 font-extrabold">Nitro Booster jet</span>
                     <span className="text-zinc-500">P Key</span>
                     <span className="text-indigo-300">Pause Match</span>
