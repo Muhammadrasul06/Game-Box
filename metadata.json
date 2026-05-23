@@ -1,0 +1,6 @@
+{
+  "name": "Game Box",
+  "description": "An aesthetic modern and retro arcade cabinet hub featuring Classic Snake, 3D Neon Racer, and a fully custom first-person Stickman Arena Combat Shooter.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
